@@ -73,6 +73,7 @@ class MainWindow(QMainWindow):
         self.chk_deskew = QCheckBox(); self.chk_deskew.setChecked(True)
         self.chk_edges = QCheckBox(); self.chk_edges.setChecked(True)
         self.chk_margins = QCheckBox(); self.chk_margins.setChecked(True)
+        self.chk_title_block = QCheckBox(); self.chk_title_block.setChecked(True)
         self.cmb_page_size = QComboBox()
         self.cmb_page_size.addItems([
             PageSizeMode.PRESERVE_DOMINANT.value,
@@ -82,6 +83,8 @@ class MainWindow(QMainWindow):
         self.spin_threshold = QSpinBox(); self.spin_threshold.setRange(100, 250); self.spin_threshold.setValue(205)
         self.spin_dark = QSpinBox(); self.spin_dark.setRange(0, 100); self.spin_dark.setValue(40)
         self.sld_margin = QSlider(Qt.Horizontal); self.sld_margin.setRange(1, 20); self.sld_margin.setValue(6)
+        self.cmb_anchor = QComboBox()
+        self.cmb_anchor.addItems(["bottom_right", "center", "top_left"])
         self.txt_suffix = QLineEdit("_normalized")
         self.txt_output = QLineEdit(str(Path.home() / "Documents" / "EskanOutput"))
         self.chk_overwrite = QCheckBox(); self.chk_overwrite.setChecked(False)
@@ -93,10 +96,12 @@ class MainWindow(QMainWindow):
         form.addRow("Deskew", self.chk_deskew)
         form.addRow("Remove dark edges", self.chk_edges)
         form.addRow("Normalize margins", self.chk_margins)
+        form.addRow("Detect title block", self.chk_title_block)
         form.addRow("Page size mode", self.cmb_page_size)
         form.addRow("Content threshold", self.spin_threshold)
         form.addRow("Dark edge threshold", self.spin_dark)
         form.addRow("Margin %", self.sld_margin)
+        form.addRow("Content anchor", self.cmb_anchor)
         form.addRow("Output suffix", self.txt_suffix)
         form.addRow("Output directory", out_widget)
         form.addRow("Overwrite", self.chk_overwrite)
@@ -151,10 +156,12 @@ class MainWindow(QMainWindow):
             deskew=self.chk_deskew.isChecked(),
             remove_dark_edges=self.chk_edges.isChecked(),
             normalize_margins=self.chk_margins.isChecked(),
+            detect_title_block=self.chk_title_block.isChecked(),
             page_size_mode=PageSizeMode(self.cmb_page_size.currentText()),
             content_threshold=self.spin_threshold.value(),
             edge_dark_threshold=self.spin_dark.value(),
             margin_ratio=self.sld_margin.value() / 100,
+            content_anchor=self.cmb_anchor.currentText(),
             output_suffix=self.txt_suffix.text().strip() or "_normalized",
             output_dir=Path(self.txt_output.text().strip()),
             overwrite=self.chk_overwrite.isChecked(),

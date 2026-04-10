@@ -14,3 +14,4 @@ class PageAnalysis:
     content_rect: Rect
     crop_rect: Rect
     skew_angle: float
+    title_block_rect: Rect | None = None
