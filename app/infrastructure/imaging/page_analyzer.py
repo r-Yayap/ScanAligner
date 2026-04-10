@@ -10,6 +10,7 @@ from app.domain.models.page_bounds import PageAnalysis, Rect
 class AnalyzerConfig:
     content_threshold: int
     edge_dark_threshold: int
+    detect_title_block: bool = True
 
 
 class PageAnalyzer:
@@ -27,7 +28,8 @@ class PageAnalyzer:
         content = Rect(x, y, w, h)
         crop = self._trim_dark_edges(gray, content, cfg.edge_dark_threshold)
         skew = self._estimate_skew(inv)
-        return PageAnalysis(content, crop, skew)
+        title_block = self._detect_title_block(gray, crop) if cfg.detect_title_block else None
+        return PageAnalysis(content, crop, skew, title_block)
 
     def _trim_dark_edges(self, gray: np.ndarray, content: Rect, dark_threshold: int) -> Rect:
         h, w = gray.shape
@@ -55,3 +57,41 @@ class PageAnalyzer:
             if -30 < angle < 30:
                 angles.append(angle)
         return float(np.median(angles)) if angles else 0.0
+
+    def _detect_title_block(self, gray: np.ndarray, crop: Rect) -> Rect | None:
+        """Detect rectangular title blocks near the bottom-right of the crop."""
+        roi = gray[crop.y:crop.y + crop.h, crop.x:crop.x + crop.w]
+        if roi.size == 0:
+            return None
+
+        blur = cv2.GaussianBlur(roi, (3, 3), 0)
+        binary = cv2.threshold(blur, 210, 255, cv2.THRESH_BINARY_INV)[1]
+        kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (3, 3))
+        binary = cv2.morphologyEx(binary, cv2.MORPH_CLOSE, kernel, iterations=1)
+        contours, _ = cv2.findContours(binary, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
+
+        best = None
+        best_score = -1.0
+        roi_h, roi_w = roi.shape
+        for cnt in contours:
+            area = cv2.contourArea(cnt)
+            if area < roi_w * roi_h * 0.005:
+                continue
+            peri = cv2.arcLength(cnt, True)
+            approx = cv2.approxPolyDP(cnt, 0.03 * peri, True)
+            if len(approx) != 4:
+                continue
+            x, y, w, h = cv2.boundingRect(cnt)
+            if w < 40 or h < 20:
+                continue
+            aspect = w / max(h, 1)
+            if not (1.5 <= aspect <= 8.0):
+                continue
+            cx = x + (w / 2)
+            cy = y + (h / 2)
+            br_bias = (cx / max(roi_w, 1)) + (cy / max(roi_h, 1))
+            score = area * br_bias
+            if score > best_score:
+                best_score = score
+                best = Rect(crop.x + x, crop.y + y, w, h)
+        return best
