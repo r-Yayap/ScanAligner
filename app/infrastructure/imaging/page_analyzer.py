@@ -54,13 +54,34 @@ class PageAnalyzer:
         lines = cv2.HoughLinesP(inv_binary, 1, np.pi / 180, threshold=100, minLineLength=120, maxLineGap=10)
         if lines is None:
             return 0.0
-        angles = []
+
+        weighted_angles: list[tuple[float, float]] = []
         for l in lines[:, 0]:
             x1, y1, x2, y2 = l
             angle = np.degrees(np.arctan2((y2 - y1), (x2 - x1)))
-            if -30 < angle < 30:
-                angles.append(angle)
-        return float(np.median(angles)) if angles else 0.0
+            if not (-15.0 < angle < 15.0):
+                continue
+            length = float(np.hypot(x2 - x1, y2 - y1))
+            if length < 80:
+                continue
+            weighted_angles.append((angle, length))
+
+        if len(weighted_angles) < 8:
+            return 0.0
+
+        angles = np.array([a for a, _ in weighted_angles], dtype=np.float32)
+        lengths = np.array([w for _, w in weighted_angles], dtype=np.float32)
+        median = float(np.median(angles))
+        mad = float(np.median(np.abs(angles - median)))
+        tolerance = max(1.2, mad * 2.5)
+        inlier_mask = np.abs(angles - median) <= tolerance
+        if int(np.count_nonzero(inlier_mask)) < 6:
+            return 0.0
+
+        inlier_angles = angles[inlier_mask]
+        inlier_lengths = lengths[inlier_mask]
+        weighted_mean = float(np.average(inlier_angles, weights=inlier_lengths))
+        return weighted_mean if abs(weighted_mean) >= 0.2 else 0.0
 
     def _detect_title_block(self, gray: np.ndarray, crop: Rect) -> Rect | None:
         """Detect a title block by finding strong rectangular structure at bottom-right."""
