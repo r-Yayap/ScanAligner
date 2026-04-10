@@ -25,7 +25,7 @@ class PageNormalizer:
         if cfg.deskew and abs(analysis.skew_angle) > 0.2:
             cropped = self._rotate(cropped, -analysis.skew_angle)
         if not cfg.normalize_margins:
-            return cv2.resize(cropped, target_size, interpolation=cv2.INTER_AREA)
+            return cropped
 
         canvas_w, canvas_h = target_size
         margin_x = int(canvas_w * cfg.margin_ratio)

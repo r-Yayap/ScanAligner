@@ -1,4 +1,5 @@
 from collections import Counter
+from math import ceil
 from pathlib import Path
 from typing import Callable
 
@@ -105,6 +106,11 @@ class ProcessDocumentsUseCase:
 
         target_size = self._compute_target_size(sizes, settings)
         reference_content_size = max(content_sizes, key=lambda s: s[0] * s[1]) if content_sizes else target_size
+        if settings.normalize_margins and 0 <= settings.margin_ratio < 0.5:
+            usable_ratio = 1.0 - (2.0 * settings.margin_ratio)
+            min_w = ceil(reference_content_size[0] / max(usable_ratio, 1e-6))
+            min_h = ceil(reference_content_size[1] / max(usable_ratio, 1e-6))
+            target_size = (max(target_size[0], min_w), max(target_size[1], min_h))
         return target_size, reference_content_size
 
     def _manual_title_block_rect(self, width: int, height: int, settings: ProcessingSettings) -> Rect | None:
