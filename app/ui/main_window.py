@@ -18,6 +18,7 @@ from PySide6.QtWidgets import (
     QSplitter,
     QTextEdit,
     QVBoxLayout,
+    QAbstractItemView,
     QWidget,
 )
 
@@ -54,7 +55,7 @@ class MainWindow(QMainWindow):
         layout = QVBoxLayout(panel)
 
         self.file_list = FileDropList()
-        self.file_list.setSelectionMode(self.file_list.ExtendedSelection)
+        self.file_list.setSelectionMode(QAbstractItemView.SelectionMode.ExtendedSelection)
         layout.addWidget(QLabel("Input PDFs (drag-drop files/folders)"))
         layout.addWidget(self.file_list)
 
