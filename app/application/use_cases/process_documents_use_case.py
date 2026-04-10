@@ -6,6 +6,7 @@ from app.application.dto.progress import ProgressUpdate
 from app.config.settings import ProcessingSettings
 from app.domain.enums.page_size_mode import PageSizeMode
 from app.domain.models.document_task import DocumentTask
+from app.domain.models.page_bounds import Rect
 from app.infrastructure.imaging.page_analyzer import AnalyzerConfig, PageAnalyzer
 from app.infrastructure.imaging.page_normalizer import NormalizeConfig, PageNormalizer
 from app.infrastructure.pdf.pdf_reader import PdfPageRenderer
@@ -39,9 +40,15 @@ class ProcessDocumentsUseCase:
                         break
                     page = doc.load_page(pidx)
                     image = self._renderer.render_page_rgb(page, settings.render_dpi)
+                    manual_rect = self._manual_title_block_rect(image.shape[1], image.shape[0], settings)
                     analysis = self._analyzer.analyze(
                         image,
-                        AnalyzerConfig(settings.content_threshold, settings.edge_dark_threshold, settings.detect_title_block),
+                        AnalyzerConfig(
+                            settings.content_threshold,
+                            settings.edge_dark_threshold,
+                            settings.detect_title_block,
+                            manual_rect,
+                        ),
                     )
                     page_result = self._normalizer.normalize(
                         image,
@@ -100,3 +107,13 @@ class ProcessDocumentsUseCase:
         target_size = self._compute_target_size(sizes, settings)
         reference_content_size = max(content_sizes, key=lambda s: s[0] * s[1]) if content_sizes else target_size
         return target_size, reference_content_size
+
+    def _manual_title_block_rect(self, width: int, height: int, settings: ProcessingSettings) -> Rect | None:
+        if not settings.manual_title_block_enabled or settings.manual_title_block_rect is None:
+            return None
+        x, y, w, h = settings.manual_title_block_rect
+        x = max(0, min(x, width - 1))
+        y = max(0, min(y, height - 1))
+        w = max(1, min(w, width - x))
+        h = max(1, min(h, height - y))
+        return Rect(x, y, w, h)

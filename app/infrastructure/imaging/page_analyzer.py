@@ -11,6 +11,7 @@ class AnalyzerConfig:
     content_threshold: int
     edge_dark_threshold: int
     detect_title_block: bool = True
+    manual_title_block_rect: Rect | None = None
 
 
 class PageAnalyzer:
@@ -28,8 +29,9 @@ class PageAnalyzer:
         content = Rect(x, y, w, h)
         crop = self._trim_dark_edges(gray, content, cfg.edge_dark_threshold)
         skew = self._estimate_skew(inv)
-        title_block = self._detect_title_block(gray, crop) if cfg.detect_title_block else None
-        title_block = self._detect_title_block(gray, crop)
+        title_block = cfg.manual_title_block_rect
+        if title_block is None and cfg.detect_title_block:
+            title_block = self._detect_title_block(gray, crop)
 
         return PageAnalysis(content, crop, skew, title_block)
 
