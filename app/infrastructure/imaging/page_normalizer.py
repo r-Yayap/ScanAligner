@@ -23,7 +23,7 @@ class PageNormalizer:
         x, y, w, h = analysis.crop_rect.x, analysis.crop_rect.y, analysis.crop_rect.w, analysis.crop_rect.h
         cropped = bgr[y:y + h, x:x + w]
         if cfg.deskew and abs(analysis.skew_angle) > 0.2:
-            cropped = self._rotate(cropped, analysis.skew_angle)
+            cropped = self._rotate(cropped, -analysis.skew_angle)
         if not cfg.normalize_margins:
             return cv2.resize(cropped, target_size, interpolation=cv2.INTER_AREA)
 

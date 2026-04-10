@@ -74,3 +74,29 @@ def test_title_block_alignment_locks_bottom_right_position() -> None:
     ys, xs = np.where(np.any(result < 40, axis=2))
     assert xs.max() == 179
     assert ys.max() == 107
+
+
+def test_deskew_rotates_in_opposite_direction_of_detected_skew() -> None:
+    class SpyNormalizer(PageNormalizer):
+        def __init__(self) -> None:
+            super().__init__()
+            self.rotated_angle: float | None = None
+
+        def _rotate(self, img: np.ndarray, angle: float) -> np.ndarray:  # type: ignore[override]
+            self.rotated_angle = angle
+            return img
+
+    image = np.zeros((20, 20, 3), dtype=np.uint8)
+    analysis = PageAnalysis(
+        content_rect=Rect(0, 0, 20, 20),
+        crop_rect=Rect(0, 0, 20, 20),
+        skew_angle=4.0,
+    )
+    normalizer = SpyNormalizer()
+    normalizer.normalize(
+        image,
+        analysis,
+        NormalizeConfig(deskew=True, normalize_margins=False, margin_ratio=0.1),
+        (20, 20),
+    )
+    assert normalizer.rotated_angle == -4.0
