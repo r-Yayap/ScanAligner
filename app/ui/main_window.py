@@ -18,6 +18,7 @@ from PySide6.QtWidgets import (
     QSplitter,
     QTextEdit,
     QVBoxLayout,
+    QAbstractItemView,
     QWidget,
 )
 
@@ -54,7 +55,7 @@ class MainWindow(QMainWindow):
         layout = QVBoxLayout(panel)
 
         self.file_list = FileDropList()
-        self.file_list.setSelectionMode(self.file_list.ExtendedSelection)
+        self.file_list.setSelectionMode(QAbstractItemView.SelectionMode.ExtendedSelection)
         layout.addWidget(QLabel("Input PDFs (drag-drop files/folders)"))
         layout.addWidget(self.file_list)
 
@@ -73,8 +74,12 @@ class MainWindow(QMainWindow):
         self.chk_deskew = QCheckBox(); self.chk_deskew.setChecked(True)
         self.chk_edges = QCheckBox(); self.chk_edges.setChecked(True)
         self.chk_margins = QCheckBox(); self.chk_margins.setChecked(True)
+<<<<<<< codex/fix-alignment-and-scaling-of-pdf-title-blocks-a351fl
         self.chk_title_block = QCheckBox(); self.chk_title_block.setChecked(False)
         self.chk_title_overlay = QCheckBox(); self.chk_title_overlay.setChecked(True)
+=======
+        self.chk_title_block = QCheckBox(); self.chk_title_block.setChecked(True)
+>>>>>>> main
         self.cmb_page_size = QComboBox()
         self.cmb_page_size.addItems([
             PageSizeMode.PRESERVE_DOMINANT.value,
@@ -98,7 +103,10 @@ class MainWindow(QMainWindow):
         form.addRow("Remove dark edges", self.chk_edges)
         form.addRow("Normalize margins", self.chk_margins)
         form.addRow("Detect title block", self.chk_title_block)
+<<<<<<< codex/fix-alignment-and-scaling-of-pdf-title-blocks-a351fl
         form.addRow("Show title block overlay", self.chk_title_overlay)
+=======
+>>>>>>> main
         form.addRow("Page size mode", self.cmb_page_size)
         form.addRow("Content threshold", self.spin_threshold)
         form.addRow("Dark edge threshold", self.spin_dark)
@@ -159,7 +167,10 @@ class MainWindow(QMainWindow):
             remove_dark_edges=self.chk_edges.isChecked(),
             normalize_margins=self.chk_margins.isChecked(),
             detect_title_block=self.chk_title_block.isChecked(),
+<<<<<<< codex/fix-alignment-and-scaling-of-pdf-title-blocks-a351fl
             show_title_block_overlay=self.chk_title_overlay.isChecked(),
+=======
+>>>>>>> main
             page_size_mode=PageSizeMode(self.cmb_page_size.currentText()),
             content_threshold=self.spin_threshold.value(),
             edge_dark_threshold=self.spin_dark.value(),

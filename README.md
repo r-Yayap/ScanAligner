@@ -17,7 +17,11 @@ Eskan is a PySide6 desktop application for normalizing scanned PDF pages before 
 5. Estimate skew via Hough line angle median.
 6. Crop and optional deskew.
 7. Compute a batch-wide canonical page size and reference content box.
+<<<<<<< codex/fix-alignment-and-scaling-of-pdf-title-blocks-a351fl
 8. Optionally detect a title block rectangle from scanned content, preview its overlay, and lock it to a stable anchor point.
+=======
+8. Optionally detect a title block rectangle from scanned content and lock it to a stable anchor point.
+>>>>>>> main
 9. Fit every page on the standardized canvas with configured margin ratio and anchor.
 10. Write processed pages back to output PDF.
 

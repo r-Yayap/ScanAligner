@@ -89,12 +89,10 @@ class ProcessDocumentsUseCase:
             try:
                 for idx in range(doc.page_count):
                     page = doc.load_page(idx)
+                    pix = page.get_pixmap(matrix=doc[idx].derotation_matrix)
+                    sizes.append((pix.width, pix.height))
                     image = self._renderer.render_page_rgb(page, settings.render_dpi)
-                    sizes.append((image.shape[1], image.shape[0]))
-                    analysis = self._analyzer.analyze(
-                        image,
-                        AnalyzerConfig(settings.content_threshold, settings.edge_dark_threshold, settings.detect_title_block),
-                    )
+                    analysis = self._analyzer.analyze(image, AnalyzerConfig(settings.content_threshold, settings.edge_dark_threshold))
                     content_sizes.append((analysis.crop_rect.w, analysis.crop_rect.h))
             finally:
                 doc.close()
