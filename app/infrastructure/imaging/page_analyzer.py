@@ -63,39 +63,50 @@ class PageAnalyzer:
         return float(np.median(angles)) if angles else 0.0
 
     def _detect_title_block(self, gray: np.ndarray, crop: Rect) -> Rect | None:
-        """Detect rectangular title blocks near the bottom-right of the crop."""
-        roi = gray[crop.y:crop.y + crop.h, crop.x:crop.x + crop.w]
-        if roi.size == 0:
+        """Detect a title block by finding strong rectangular structure at bottom-right."""
+        page_roi = gray[crop.y:crop.y + crop.h, crop.x:crop.x + crop.w]
+        if page_roi.size == 0:
             return None
 
-        blur = cv2.GaussianBlur(roi, (3, 3), 0)
-        binary = cv2.threshold(blur, 210, 255, cv2.THRESH_BINARY_INV)[1]
-        kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (3, 3))
-        binary = cv2.morphologyEx(binary, cv2.MORPH_CLOSE, kernel, iterations=1)
+        roi_h, roi_w = page_roi.shape
+        sx = max(0, int(roi_w * 0.55))
+        sy = max(0, int(roi_h * 0.55))
+        focus = page_roi[sy:, sx:]
+        if focus.size == 0:
+            return None
+
+        blur = cv2.GaussianBlur(focus, (3, 3), 0)
+        binary = cv2.threshold(blur, 220, 255, cv2.THRESH_BINARY_INV)[1]
+        kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (5, 5))
+        binary = cv2.morphologyEx(binary, cv2.MORPH_CLOSE, kernel, iterations=2)
         contours, _ = cv2.findContours(binary, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
 
         best = None
         best_score = -1.0
-        roi_h, roi_w = roi.shape
         for cnt in contours:
             area = cv2.contourArea(cnt)
-            if area < roi_w * roi_h * 0.005:
-                continue
-            peri = cv2.arcLength(cnt, True)
-            approx = cv2.approxPolyDP(cnt, 0.03 * peri, True)
-            if len(approx) != 4:
+            if area < focus.shape[1] * focus.shape[0] * 0.02:
                 continue
             x, y, w, h = cv2.boundingRect(cnt)
-            if w < 40 or h < 20:
+            if w < 50 or h < 25:
                 continue
             aspect = w / max(h, 1)
             if not (1.5 <= aspect <= 8.0):
                 continue
-            cx = x + (w / 2)
-            cy = y + (h / 2)
+            fill_ratio = area / max(w * h, 1)
+            if fill_ratio < 0.45:
+                continue
+
+            global_x = sx + x
+            global_y = sy + y
+            cx = global_x + (w / 2)
+            cy = global_y + (h / 2)
             br_bias = (cx / max(roi_w, 1)) + (cy / max(roi_h, 1))
-            score = area * br_bias
+
+            edge_patch = binary[max(y - 2, 0):min(y + h + 2, binary.shape[0]), max(x - 2, 0):min(x + w + 2, binary.shape[1])]
+            edge_density = float(np.count_nonzero(edge_patch)) / max(edge_patch.size, 1)
+            score = (area * br_bias) * (0.6 + edge_density)
             if score > best_score:
                 best_score = score
-                best = Rect(crop.x + x, crop.y + y, w, h)
+                best = Rect(crop.x + global_x, crop.y + global_y, w, h)
         return best

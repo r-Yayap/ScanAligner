@@ -23,3 +23,21 @@ def test_page_analyzer_respects_manual_title_block_override() -> None:
         AnalyzerConfig(content_threshold=200, edge_dark_threshold=30, detect_title_block=False, manual_title_block_rect=manual_rect),
     )
     assert result.title_block_rect == manual_rect
+
+
+def test_page_analyzer_detects_bottom_right_title_block() -> None:
+    img = np.full((300, 400, 3), 255, dtype=np.uint8)
+    cv2.rectangle(img, (40, 40), (360, 260), (0, 0, 0), 2)
+    cv2.rectangle(img, (250, 220), (380, 280), (0, 0, 0), 3)
+    cv2.line(img, (250, 240), (380, 240), (0, 0, 0), 2)
+    cv2.line(img, (315, 220), (315, 280), (0, 0, 0), 2)
+
+    analyzer = PageAnalyzer()
+    result = analyzer.analyze(img, AnalyzerConfig(content_threshold=220, edge_dark_threshold=30, detect_title_block=True))
+
+    assert result.title_block_rect is not None
+    tb = result.title_block_rect
+    assert tb.x >= 240
+    assert tb.y >= 210
+    assert tb.w >= 120
+    assert tb.h >= 55
