@@ -39,7 +39,10 @@ class ProcessDocumentsUseCase:
                         break
                     page = doc.load_page(pidx)
                     image = self._renderer.render_page_rgb(page, settings.render_dpi)
-                    analysis = self._analyzer.analyze(image, AnalyzerConfig(settings.content_threshold, settings.edge_dark_threshold))
+                    analysis = self._analyzer.analyze(
+                        image,
+                        AnalyzerConfig(settings.content_threshold, settings.edge_dark_threshold, settings.detect_title_block),
+                    )
                     page_result = self._normalizer.normalize(
                         image,
                         analysis,

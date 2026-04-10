@@ -10,6 +10,7 @@ from app.domain.models.page_bounds import PageAnalysis, Rect
 class AnalyzerConfig:
     content_threshold: int
     edge_dark_threshold: int
+    detect_title_block: bool = True
 
 
 class PageAnalyzer:
@@ -27,7 +28,11 @@ class PageAnalyzer:
         content = Rect(x, y, w, h)
         crop = self._trim_dark_edges(gray, content, cfg.edge_dark_threshold)
         skew = self._estimate_skew(inv)
+<<<<<<< codex/fix-alignment-and-scaling-of-pdf-title-blocks-a351fl
+        title_block = self._detect_title_block(gray, crop) if cfg.detect_title_block else None
+=======
         title_block = self._detect_title_block(gray, crop)
+>>>>>>> main
         return PageAnalysis(content, crop, skew, title_block)
 
     def _trim_dark_edges(self, gray: np.ndarray, content: Rect, dark_threshold: int) -> Rect:
