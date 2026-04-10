@@ -26,6 +26,7 @@ from app.config.settings import ProcessingSettings
 from app.domain.enums.page_size_mode import PageSizeMode
 from app.ui.dialogs.append_replace_dialog import ask_append_or_replace
 from app.ui.widgets.file_drop_list import FileDropList
+from app.ui.widgets.selectable_image_label import SelectableImageLabel
 
 
 class MainWindow(QMainWindow):
@@ -74,9 +75,10 @@ class MainWindow(QMainWindow):
         self.chk_deskew = QCheckBox(); self.chk_deskew.setChecked(True)
         self.chk_edges = QCheckBox(); self.chk_edges.setChecked(True)
         self.chk_margins = QCheckBox(); self.chk_margins.setChecked(True)
-        self.chk_title_block = QCheckBox(); self.chk_title_block.setChecked(False)
-        self.chk_title_overlay = QCheckBox(); self.chk_title_overlay.setChecked(True)
         self.chk_title_block = QCheckBox(); self.chk_title_block.setChecked(True)
+        self.chk_title_overlay = QCheckBox(); self.chk_title_overlay.setChecked(True)
+        self.chk_manual_title_block = QCheckBox(); self.chk_manual_title_block.setChecked(False)
+        self.btn_clear_title_selection = QPushButton("Clear title block selection")
         self.cmb_page_size = QComboBox()
         self.cmb_page_size.addItems([
             PageSizeMode.PRESERVE_DOMINANT.value,
@@ -101,6 +103,8 @@ class MainWindow(QMainWindow):
         form.addRow("Normalize margins", self.chk_margins)
         form.addRow("Detect title block", self.chk_title_block)
         form.addRow("Show title block overlay", self.chk_title_overlay)
+        form.addRow("Select title block on page", self.chk_manual_title_block)
+        form.addRow("", self.btn_clear_title_selection)
         form.addRow("Page size mode", self.cmb_page_size)
         form.addRow("Content threshold", self.spin_threshold)
         form.addRow("Dark edge threshold", self.spin_dark)
@@ -139,11 +143,9 @@ class MainWindow(QMainWindow):
         layout.addLayout(nav)
 
         pv = QHBoxLayout()
-        self.lbl_original = QLabel("Original")
+        self.lbl_original = SelectableImageLabel("Original")
         self.lbl_processed = QLabel("Processed")
-        self.lbl_original.setAlignment(Qt.AlignCenter)
         self.lbl_processed.setAlignment(Qt.AlignCenter)
-        self.lbl_original.setMinimumSize(450, 600)
         self.lbl_processed.setMinimumSize(450, 600)
         pv.addWidget(self.lbl_original)
         pv.addWidget(self.lbl_processed)
@@ -162,6 +164,8 @@ class MainWindow(QMainWindow):
             normalize_margins=self.chk_margins.isChecked(),
             detect_title_block=self.chk_title_block.isChecked(),
             show_title_block_overlay=self.chk_title_overlay.isChecked(),
+            manual_title_block_enabled=self.chk_manual_title_block.isChecked(),
+            manual_title_block_rect=self.selected_title_block_rect(),
             page_size_mode=PageSizeMode(self.cmb_page_size.currentText()),
             content_threshold=self.spin_threshold.value(),
             edge_dark_threshold=self.spin_dark.value(),
@@ -201,8 +205,15 @@ class MainWindow(QMainWindow):
         self.lbl_page.setText(f"{current}/{total}")
 
     def show_preview(self, original, processed) -> None:
-        self.lbl_original.setPixmap(original.scaled(self.lbl_original.size(), Qt.KeepAspectRatio, Qt.SmoothTransformation))
+        self.lbl_original.set_display_pixmap(original)
+        self.lbl_original.set_selection_enabled(self.chk_manual_title_block.isChecked())
         self.lbl_processed.setPixmap(processed.scaled(self.lbl_processed.size(), Qt.KeepAspectRatio, Qt.SmoothTransformation))
+
+    def selected_title_block_rect(self) -> tuple[int, int, int, int] | None:
+        return self.lbl_original.selected_image_rect()
+
+    def clear_title_block_selection(self) -> None:
+        self.lbl_original.clear_selection()
 
     def update_progress(self, progress) -> None:
         pct = int(((progress.file_index - 1) + progress.page_index / max(1, progress.page_total)) / max(1, progress.file_total) * 100)

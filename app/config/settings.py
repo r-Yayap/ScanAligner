@@ -20,6 +20,8 @@ class ProcessingSettings:
     content_anchor: str = "bottom_right"
     detect_title_block: bool = True
     show_title_block_overlay: bool = True
+    manual_title_block_enabled: bool = False
+    manual_title_block_rect: tuple[int, int, int, int] | None = None
     render_dpi: int = DEFAULT_DPI
     output_suffix: str = DEFAULT_OUTPUT_SUFFIX
     output_dir: Path = DEFAULT_OUTPUT_DIR

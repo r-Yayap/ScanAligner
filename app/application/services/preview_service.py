@@ -1,6 +1,7 @@
 import cv2
 
 from app.config.settings import ProcessingSettings
+from app.domain.models.page_bounds import Rect
 from app.infrastructure.imaging.page_analyzer import AnalyzerConfig, PageAnalyzer
 from app.infrastructure.imaging.page_normalizer import NormalizeConfig, PageNormalizer
 from app.infrastructure.pdf.pdf_reader import PdfPageRenderer
@@ -17,9 +18,15 @@ class PreviewService:
         try:
             page = doc.load_page(page_index)
             original = self._renderer.render_page_rgb(page, settings.render_dpi)
+            manual_rect = self._manual_title_block_rect(original.shape[1], original.shape[0], settings)
             analysis = self._analyzer.analyze(
                 original,
-                AnalyzerConfig(settings.content_threshold, settings.edge_dark_threshold, settings.detect_title_block),
+                AnalyzerConfig(
+                    settings.content_threshold,
+                    settings.edge_dark_threshold,
+                    settings.detect_title_block,
+                    manual_rect,
+                ),
             )
             processed = self._normalizer.normalize(
                 original,
@@ -41,3 +48,13 @@ class PreviewService:
             return overlay_original, processed, doc.page_count
         finally:
             doc.close()
+
+    def _manual_title_block_rect(self, width: int, height: int, settings: ProcessingSettings) -> Rect | None:
+        if not settings.manual_title_block_enabled or settings.manual_title_block_rect is None:
+            return None
+        x, y, w, h = settings.manual_title_block_rect
+        x = max(0, min(x, width - 1))
+        y = max(0, min(y, height - 1))
+        w = max(1, min(w, width - x))
+        h = max(1, min(h, height - y))
+        return Rect(x, y, w, h)
