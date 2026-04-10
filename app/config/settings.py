@@ -19,6 +19,7 @@ class ProcessingSettings:
     margin_ratio: float = DEFAULT_MARGIN_RATIO
     content_anchor: str = "bottom_right"
     detect_title_block: bool = True
+    show_title_block_overlay: bool = True
     render_dpi: int = DEFAULT_DPI
     output_suffix: str = DEFAULT_OUTPUT_SUFFIX
     output_dir: Path = DEFAULT_OUTPUT_DIR
