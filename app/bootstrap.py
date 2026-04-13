@@ -32,7 +32,7 @@ def build_app() -> tuple[MainWindow, MainPresenter]:
     view.btn_clear.clicked.connect(presenter.clear_files)
     view.btn_browse_out.clicked.connect(view.choose_output_dir)
     view.btn_browse_template.clicked.connect(lambda: _select_template(view, presenter))
-    view.btn_preview.clicked.connect(lambda: _refresh_preview(view, presenter, 0))
+    view.btn_preview.clicked.connect(lambda: _refresh_preview(view, presenter, 0, include_processed=True))
     view.btn_prev.clicked.connect(lambda: _navigate(view, presenter, -1))
     view.btn_next.clicked.connect(lambda: _navigate(view, presenter, 1))
     view.file_list.currentRowChanged.connect(lambda _: _refresh_preview(view, presenter, 0))
@@ -64,13 +64,13 @@ def _on_drop(paths: list[str], view: MainWindow, presenter: MainPresenter) -> No
     presenter.add_paths(paths, replace=mode == "replace")
 
 
-def _refresh_preview(view: MainWindow, presenter: MainPresenter, delta: int) -> None:
+def _refresh_preview(view: MainWindow, presenter: MainPresenter, delta: int, include_processed: bool = False) -> None:
     if not presenter.input_files:
         return
     presenter.current_page = max(0, presenter.current_page + delta)
     settings = view.get_settings()
     idx = view.current_file_index()
-    presenter.preview(idx, presenter.current_page, settings)
+    presenter.preview(idx, presenter.current_page, settings, include_processed=include_processed)
 
 
 def _navigate(view: MainWindow, presenter: MainPresenter, delta: int) -> None:
