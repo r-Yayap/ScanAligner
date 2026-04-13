@@ -3,6 +3,8 @@ from math import ceil
 from pathlib import Path
 from typing import Callable
 
+import cv2
+
 from app.application.dto.progress import ProgressUpdate
 from app.config.settings import ProcessingSettings
 from app.domain.enums.page_size_mode import PageSizeMode
@@ -29,6 +31,7 @@ class ProcessDocumentsUseCase:
         cancel_requested: Callable[[], bool],
     ) -> tuple[int, int]:
         processed = 0
+        template = self._load_title_block_template(settings)
         target_size, reference_content_size = self._compute_batch_layout(tasks, settings, cancel_requested)
         for file_idx, task in enumerate(tasks, start=1):
             if cancel_requested():
@@ -42,6 +45,8 @@ class ProcessDocumentsUseCase:
                     page = doc.load_page(pidx)
                     image = self._renderer.render_page_rgb(page, settings.render_dpi)
                     manual_rect = self._manual_title_block_rect(image.shape[1], image.shape[0], settings)
+                    if template is None and settings.derive_template_from_selection and manual_rect is not None:
+                        template = image[manual_rect.y:manual_rect.y + manual_rect.h, manual_rect.x:manual_rect.x + manual_rect.w].copy()
                     analysis = self._analyzer.analyze(
                         image,
                         AnalyzerConfig(
@@ -49,6 +54,7 @@ class ProcessDocumentsUseCase:
                             settings.edge_dark_threshold,
                             settings.detect_title_block,
                             manual_rect,
+                            template,
                         ),
                     )
                     page_result = self._normalizer.normalize(
@@ -122,3 +128,18 @@ class ProcessDocumentsUseCase:
         w = max(1, min(w, width - x))
         h = max(1, min(h, height - y))
         return Rect(x, y, w, h)
+
+    def _load_title_block_template(self, settings: ProcessingSettings):
+        if settings.title_block_template_path is None:
+            return None
+        path = settings.title_block_template_path
+        if path.suffix.lower() == ".pdf":
+            doc = self._renderer.open_document(path)
+            try:
+                if doc.page_count == 0:
+                    return None
+                first_page = doc.load_page(0)
+                return self._renderer.render_page_rgb(first_page, 200)
+            finally:
+                doc.close()
+        return cv2.imread(str(path))
