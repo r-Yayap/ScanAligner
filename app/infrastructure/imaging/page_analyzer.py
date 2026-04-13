@@ -46,7 +46,7 @@ class PageAnalyzer:
         skew = self._estimate_skew(inv)
         title_block = cfg.manual_title_block_rect
         if title_block is None and cfg.detect_title_block:
-            title_block = self._detect_title_block_from_template(gray, crop, cfg.title_block_template)
+            title_block = self._detect_title_block_from_template(gray, crop, cfg.title_block_template, cfg)
             if title_block is None:
                 title_block = self._detect_title_block(gray, crop)
 
@@ -149,7 +149,13 @@ class PageAnalyzer:
                 best = Rect(crop.x + global_x, crop.y + global_y, w, h)
         return best
 
-    def _detect_title_block_from_template(self, gray: np.ndarray, crop: Rect, template_bgr: np.ndarray | None) -> Rect | None:
+    def _detect_title_block_from_template(
+        self,
+        gray: np.ndarray,
+        crop: Rect,
+        template_bgr: np.ndarray | None,
+        cfg: AnalyzerConfig,
+    ) -> Rect | None:
         if template_bgr is None:
             return None
 
@@ -192,8 +198,15 @@ class PageAnalyzer:
         h_t, w_t = template_gray.shape[:2]
         corners = np.float32([[0, 0], [w_t - 1, 0], [w_t - 1, h_t - 1], [0, h_t - 1]]).reshape(-1, 1, 2)
         projected = cv2.perspectiveTransform(corners, homography).reshape(-1, 2)
+        if not cv2.isContourConvex(np.int32(projected)):
+            return None
         x, y, w, h = cv2.boundingRect(np.int32(projected))
         if w <= 0 or h <= 0:
+            return None
+        roi_area = max(1, roi_w * roi_h)
+        rect_area = w * h
+        area_ratio = rect_area / roi_area
+        if not (0.002 <= area_ratio <= 0.25):
             return None
         return Rect(crop.x + x, crop.y + y, w, h)
 

@@ -41,3 +41,21 @@ def test_page_analyzer_detects_bottom_right_title_block() -> None:
     assert tb.y >= 210
     assert tb.w >= 120
     assert tb.h >= 55
+
+
+def test_page_analyzer_template_detection_path_does_not_raise() -> None:
+    img = np.full((220, 320, 3), 255, dtype=np.uint8)
+    template = np.full((50, 120, 3), 255, dtype=np.uint8)
+    analyzer = PageAnalyzer()
+
+    result = analyzer.analyze(
+        img,
+        AnalyzerConfig(
+            content_threshold=220,
+            edge_dark_threshold=30,
+            detect_title_block=True,
+            title_block_template=template,
+        ),
+    )
+
+    assert result is not None
