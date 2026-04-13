@@ -120,6 +120,7 @@ class MainWindow(QMainWindow):
         form.addRow("Output suffix", self.txt_suffix)
         form.addRow("Output directory", out_widget)
         form.addRow("Overwrite", self.chk_overwrite)
+        self._set_settings_tooltips()
 
         layout.addWidget(settings_box)
 
@@ -222,10 +223,36 @@ class MainWindow(QMainWindow):
     def set_page_label(self, current: int, total: int) -> None:
         self.lbl_page.setText(f"{current}/{total}")
 
-    def show_preview(self, original, processed) -> None:
+    def show_preview(self, original, processed=None) -> None:
         self.lbl_original.set_display_pixmap(original)
         self.lbl_original.set_selection_enabled(self.chk_manual_title_block.isChecked())
+        if processed is None:
+            self.lbl_processed.clear()
+            self.lbl_processed.setText("Processed preview is hidden.\nClick 'Refresh Preview' to generate it for the current page.")
+            return
         self.lbl_processed.setPixmap(processed.scaled(self.lbl_processed.size(), Qt.KeepAspectRatio, Qt.SmoothTransformation))
+
+    def _set_settings_tooltips(self) -> None:
+        self.chk_crop.setToolTip("Automatically trims outer blank borders around page content before other normalization steps.")
+        self.chk_deskew.setToolTip("Detects and rotates tilted scans so text and drawing lines are properly horizontal/vertical.")
+        self.chk_edges.setToolTip("Detects dark scanner edges and shadows, then excludes them from content detection and cleanup.")
+        self.chk_margins.setToolTip("Applies consistent margins around detected content so pages align visually in the output.")
+        self.chk_title_block.setToolTip("Detects the title block region (typically bottom-right) to help alignment decisions.")
+        self.chk_title_overlay.setToolTip("Draws the detected title block rectangle on the ORIGINAL preview for visual verification.")
+        self.txt_title_template.setToolTip("Optional image/PDF template used to improve title block detection and alignment.")
+        self.btn_browse_template.setToolTip("Choose a title block template file from disk.")
+        self.chk_template_from_selection.setToolTip("Uses the rectangle selected on the current page as the template patch for title block matching.")
+        self.chk_manual_title_block.setToolTip("Enables rectangle selection on the original preview to manually mark a title block area.")
+        self.btn_clear_title_selection.setToolTip("Clears the manually selected title block rectangle.")
+        self.cmb_page_size.setToolTip("Controls output page sizing: preserve dominant size, force all pages to one size, or fit around content.")
+        self.spin_threshold.setToolTip("Pixel intensity threshold for content detection. Lower values keep lighter marks; higher values are stricter.")
+        self.spin_dark.setToolTip("Threshold for dark-edge detection strength. Increase if scanner shadows are still visible.")
+        self.sld_margin.setToolTip("Target margin percentage around content when margin normalization is enabled.")
+        self.cmb_anchor.setToolTip("Anchor used while placing content in normalized pages (e.g., bottom-right keeps title blocks aligned).")
+        self.txt_suffix.setToolTip("Suffix appended to generated file names.")
+        self.txt_output.setToolTip("Destination folder where processed PDFs are written.")
+        self.btn_browse_out.setToolTip("Choose the output folder.")
+        self.chk_overwrite.setToolTip("If enabled, existing output files with the same name are replaced.")
 
     def selected_title_block_rect(self) -> tuple[int, int, int, int] | None:
         return self.lbl_original.selected_image_rect()

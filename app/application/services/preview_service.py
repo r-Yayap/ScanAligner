@@ -13,11 +13,14 @@ class PreviewService:
         self._analyzer = analyzer
         self._normalizer = normalizer
 
-    def preview_page(self, pdf_path, page_index: int, settings: ProcessingSettings):
+    def preview_page(self, pdf_path, page_index: int, settings: ProcessingSettings, include_processed: bool = False):
         doc = self._renderer.open_document(pdf_path)
         try:
-            page = doc.load_page(page_index)
+            safe_index = max(0, min(page_index, max(0, doc.page_count - 1)))
+            page = doc.load_page(safe_index)
             original = self._renderer.render_page_rgb(page, settings.render_dpi)
+            if not include_processed:
+                return original, None, doc.page_count
             manual_rect = self._manual_title_block_rect(original.shape[1], original.shape[0], settings)
             template = self._load_title_block_template(settings, original, manual_rect)
             analysis = self._analyzer.analyze(
