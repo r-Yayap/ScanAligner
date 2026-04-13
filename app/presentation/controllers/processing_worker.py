@@ -33,7 +33,14 @@ class ProcessingWorker(QObject):
         try:
             tasks = self._discovery.build_tasks(self._inputs, self._settings.output_dir, self._settings.output_suffix, self._settings.overwrite)
             self.log.emit(f"Queued {len(tasks)} files")
-            processed, total = self._use_case.execute(tasks, self._settings, self._on_progress, self._is_cancelled)
+            self.log.emit(
+                "Template controls: "
+                f"search-start={int(self._settings.template_search_region_ratio * 100)}%, "
+                f"min-matches={self._settings.template_min_good_matches}, "
+                f"max-features={self._settings.template_max_features}, "
+                f"preflight-sample={self._settings.preflight_sample_pages}"
+            )
+            processed, total = self._use_case.execute(tasks, self._settings, self._on_progress, self._is_cancelled, self.log.emit)
             self.finished.emit(processed, total)
         except Exception as exc:
             self.failed.emit(str(exc))

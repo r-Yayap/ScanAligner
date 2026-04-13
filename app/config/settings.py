@@ -24,6 +24,11 @@ class ProcessingSettings:
     manual_title_block_rect: tuple[int, int, int, int] | None = None
     title_block_template_path: Path | None = None
     derive_template_from_selection: bool = False
+    template_search_region_ratio: float = 0.55
+    template_min_good_matches: int = 20
+    template_max_features: int = 2200
+    preflight_sample_pages: int = 2
+    debug_tracing: bool = False
     render_dpi: int = DEFAULT_DPI
     output_suffix: str = DEFAULT_OUTPUT_SUFFIX
     output_dir: Path = DEFAULT_OUTPUT_DIR

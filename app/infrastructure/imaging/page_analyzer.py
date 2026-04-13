@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+import hashlib
 
 import cv2
 import numpy as np
@@ -18,10 +19,18 @@ class AnalyzerConfig:
     detect_title_block: bool = True
     manual_title_block_rect: Rect | None = None
     title_block_template: np.ndarray | None = None
+    template_search_region_ratio: float = 0.55
+    template_min_good_matches: int = 20
+    template_max_features: int = 2200
 
 
 class PageAnalyzer:
     """Detects content bounds, crop area, and skew angle."""
+    def __init__(self) -> None:
+        self._template_cache_key: str | None = None
+        self._template_cache_gray: np.ndarray | None = None
+        self._template_cache_keypoints = None
+        self._template_cache_descriptors = None
 
     def analyze(self, bgr: np.ndarray, cfg: AnalyzerConfig) -> PageAnalysis:
         gray = cv2.cvtColor(bgr, cv2.COLOR_BGR2GRAY)
@@ -149,21 +158,29 @@ class PageAnalyzer:
             return None
 
         template_gray = preprocess_for_features(template_bgr)
+        template_key = self._template_signature(template_gray)
         roi_bgr = cv2.cvtColor(roi, cv2.COLOR_GRAY2BGR)
         roi_gray = preprocess_for_features(roi_bgr)
 
-        detector, matcher, _ = create_detector(prefer_sift=True)
-        kp_t, des_t = detector.detectAndCompute(template_gray, None)
-        kp_r, des_r = detector.detectAndCompute(roi_gray, None)
+        detector, matcher, _ = create_detector(prefer_sift=True, nfeatures=cfg.template_max_features)
+        kp_t, des_t = self._template_features(detector, template_key, template_gray)
+        search_ratio = min(0.9, max(0.1, cfg.template_search_region_ratio))
+        roi_h, roi_w = roi_gray.shape
+        sx = int(roi_w * search_ratio)
+        sy = int(roi_h * search_ratio)
+        focused_roi = roi_gray[sy:, sx:]
+        if focused_roi.size == 0:
+            return None
+        kp_r, des_r = detector.detectAndCompute(focused_roi, None)
         if des_t is None or des_r is None:
             return None
 
         good = knn_ratio_match(des_t, des_r, matcher, ratio=0.75)
-        if len(good) < 20:
+        if len(good) < cfg.template_min_good_matches:
             return None
 
         src_pts = np.float32([kp_t[m.queryIdx].pt for m in good]).reshape(-1, 1, 2)
-        dst_pts = np.float32([kp_r[m.trainIdx].pt for m in good]).reshape(-1, 1, 2)
+        dst_pts = np.float32([(kp_r[m.trainIdx].pt[0] + sx, kp_r[m.trainIdx].pt[1] + sy) for m in good]).reshape(-1, 1, 2)
         homography, inlier_mask = cv2.findHomography(src_pts, dst_pts, cv2.RANSAC, 4.0)
         if homography is None:
             return None
@@ -179,3 +196,16 @@ class PageAnalyzer:
         if w <= 0 or h <= 0:
             return None
         return Rect(crop.x + x, crop.y + y, w, h)
+
+    def _template_signature(self, gray: np.ndarray) -> str:
+        return hashlib.md5(gray.tobytes()).hexdigest()
+
+    def _template_features(self, detector, key: str, template_gray: np.ndarray):
+        if self._template_cache_key == key and self._template_cache_descriptors is not None:
+            return self._template_cache_keypoints, self._template_cache_descriptors
+        kp_t, des_t = detector.detectAndCompute(template_gray, None)
+        self._template_cache_key = key
+        self._template_cache_gray = template_gray
+        self._template_cache_keypoints = kp_t
+        self._template_cache_descriptors = des_t
+        return kp_t, des_t
