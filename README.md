@@ -17,21 +17,46 @@ Eskan is a PySide6 desktop application for normalizing scanned PDF pages before 
 5. Estimate skew via Hough line angle median.
 6. Crop and optional deskew.
 7. Compute a batch-wide canonical page size and reference content box.
-<<<<<<< codex/fix-alignment-and-scaling-of-pdf-title-blocks-a351fl
 8. Optionally detect a title block rectangle from scanned content, preview its overlay, and lock it to a stable anchor point.
-=======
-8. Optionally detect a title block rectangle from scanned content and lock it to a stable anchor point.
->>>>>>> main
 9. Fit every page on the standardized canvas with configured margin ratio and anchor.
 10. Write processed pages back to output PDF.
 
-## Run
+## Run the desktop app
 ```bash
 python -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
 python -m app.main
 ```
+
+You can also run:
+```bash
+python app/main.py
+```
+
+## Title block template aligner (GUI-integrated)
+Title block template alignment is available directly in the desktop app:
+- enable **Detect title block**
+- choose one template source:
+  - **Upload template file** with **Title block template** (`.png`, `.jpg`, `.jpeg`, `.bmp`, `.tif`, `.tiff`, or `.pdf` where first page is used)
+  - **Use selected block as template** after drawing a title-block selection on the preview page
+- run preview/processing as usual
+
+If both are provided, the uploaded template image is used first.
+
+The CLI remains available for debugging and experimentation:
+Run it with:
+```bash
+python -m app.infrastructure.imaging.title_block_template_aligner \
+  --template path/to/titleblock_template.png \
+  --scan path/to/scanned_page.png \
+  --out-prefix out/page01
+```
+
+This writes:
+- `out/page01_detected_titleblock.png`
+- `out/page01_aligned_scan.png`
+- `out/page01_matches.png`
 
 ## Tests
 ```bash

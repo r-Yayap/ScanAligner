@@ -4,6 +4,11 @@ import cv2
 import numpy as np
 
 from app.domain.models.page_bounds import PageAnalysis, Rect
+from app.infrastructure.imaging.title_block_template_aligner import (
+    create_detector,
+    knn_ratio_match,
+    preprocess_for_features,
+)
 
 
 @dataclass(slots=True)
@@ -12,6 +17,7 @@ class AnalyzerConfig:
     edge_dark_threshold: int
     detect_title_block: bool = True
     manual_title_block_rect: Rect | None = None
+    title_block_template: np.ndarray | None = None
 
 
 class PageAnalyzer:
@@ -31,7 +37,9 @@ class PageAnalyzer:
         skew = self._estimate_skew(inv)
         title_block = cfg.manual_title_block_rect
         if title_block is None and cfg.detect_title_block:
-            title_block = self._detect_title_block(gray, crop)
+            title_block = self._detect_title_block_from_template(gray, crop, cfg.title_block_template)
+            if title_block is None:
+                title_block = self._detect_title_block(gray, crop)
 
         return PageAnalysis(content, crop, skew, title_block)
 
@@ -131,3 +139,43 @@ class PageAnalyzer:
                 best_score = score
                 best = Rect(crop.x + global_x, crop.y + global_y, w, h)
         return best
+
+    def _detect_title_block_from_template(self, gray: np.ndarray, crop: Rect, template_bgr: np.ndarray | None) -> Rect | None:
+        if template_bgr is None:
+            return None
+
+        roi = gray[crop.y:crop.y + crop.h, crop.x:crop.x + crop.w]
+        if roi.size == 0:
+            return None
+
+        template_gray = preprocess_for_features(template_bgr)
+        roi_bgr = cv2.cvtColor(roi, cv2.COLOR_GRAY2BGR)
+        roi_gray = preprocess_for_features(roi_bgr)
+
+        detector, matcher, _ = create_detector(prefer_sift=True)
+        kp_t, des_t = detector.detectAndCompute(template_gray, None)
+        kp_r, des_r = detector.detectAndCompute(roi_gray, None)
+        if des_t is None or des_r is None:
+            return None
+
+        good = knn_ratio_match(des_t, des_r, matcher, ratio=0.75)
+        if len(good) < 20:
+            return None
+
+        src_pts = np.float32([kp_t[m.queryIdx].pt for m in good]).reshape(-1, 1, 2)
+        dst_pts = np.float32([kp_r[m.trainIdx].pt for m in good]).reshape(-1, 1, 2)
+        homography, inlier_mask = cv2.findHomography(src_pts, dst_pts, cv2.RANSAC, 4.0)
+        if homography is None:
+            return None
+
+        inliers = int(inlier_mask.sum()) if inlier_mask is not None else 0
+        if inliers < max(10, int(0.25 * len(good))):
+            return None
+
+        h_t, w_t = template_gray.shape[:2]
+        corners = np.float32([[0, 0], [w_t - 1, 0], [w_t - 1, h_t - 1], [0, h_t - 1]]).reshape(-1, 1, 2)
+        projected = cv2.perspectiveTransform(corners, homography).reshape(-1, 2)
+        x, y, w, h = cv2.boundingRect(np.int32(projected))
+        if w <= 0 or h <= 0:
+            return None
+        return Rect(crop.x + x, crop.y + y, w, h)

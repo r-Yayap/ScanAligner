@@ -78,7 +78,12 @@ class MainWindow(QMainWindow):
         self.chk_title_block = QCheckBox(); self.chk_title_block.setChecked(True)
         self.chk_title_overlay = QCheckBox(); self.chk_title_overlay.setChecked(True)
         self.chk_manual_title_block = QCheckBox(); self.chk_manual_title_block.setChecked(False)
+        self.chk_template_from_selection = QCheckBox(); self.chk_template_from_selection.setChecked(False)
         self.btn_clear_title_selection = QPushButton("Clear title block selection")
+        self.txt_title_template = QLineEdit("")
+        self.btn_browse_template = QPushButton("Browse")
+        template_row = QHBoxLayout(); template_row.addWidget(self.txt_title_template); template_row.addWidget(self.btn_browse_template)
+        template_widget = QWidget(); template_widget.setLayout(template_row)
         self.cmb_page_size = QComboBox()
         self.cmb_page_size.addItems([
             PageSizeMode.PRESERVE_DOMINANT.value,
@@ -103,6 +108,8 @@ class MainWindow(QMainWindow):
         form.addRow("Normalize margins", self.chk_margins)
         form.addRow("Detect title block", self.chk_title_block)
         form.addRow("Show title block overlay", self.chk_title_overlay)
+        form.addRow("Title block template", template_widget)
+        form.addRow("Use selected block as template", self.chk_template_from_selection)
         form.addRow("Select title block on page", self.chk_manual_title_block)
         form.addRow("", self.btn_clear_title_selection)
         form.addRow("Page size mode", self.cmb_page_size)
@@ -166,6 +173,8 @@ class MainWindow(QMainWindow):
             show_title_block_overlay=self.chk_title_overlay.isChecked(),
             manual_title_block_enabled=self.chk_manual_title_block.isChecked(),
             manual_title_block_rect=self.selected_title_block_rect(),
+            title_block_template_path=Path(p) if (p := self.txt_title_template.text().strip()) else None,
+            derive_template_from_selection=self.chk_template_from_selection.isChecked(),
             page_size_mode=PageSizeMode(self.cmb_page_size.currentText()),
             content_threshold=self.spin_threshold.value(),
             edge_dark_threshold=self.spin_dark.value(),
@@ -180,6 +189,15 @@ class MainWindow(QMainWindow):
         selected = QFileDialog.getExistingDirectory(self, "Select output directory")
         if selected:
             self.txt_output.setText(selected)
+
+    def choose_title_template(self) -> None:
+        selected, _ = QFileDialog.getOpenFileName(
+            self,
+            "Select title block template file",
+            filter="Template files (*.png *.jpg *.jpeg *.bmp *.tif *.tiff *.pdf)",
+        )
+        if selected:
+            self.txt_title_template.setText(selected)
 
     def maybe_append_or_replace(self) -> str:
         if self.file_list.count() == 0:

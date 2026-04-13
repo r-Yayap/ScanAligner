@@ -31,6 +31,7 @@ def build_app() -> tuple[MainWindow, MainPresenter]:
     view.btn_remove.clicked.connect(lambda: presenter.remove_selected(view.selected_file_indexes()))
     view.btn_clear.clicked.connect(presenter.clear_files)
     view.btn_browse_out.clicked.connect(view.choose_output_dir)
+    view.btn_browse_template.clicked.connect(lambda: _select_template(view, presenter))
     view.btn_preview.clicked.connect(lambda: _refresh_preview(view, presenter, 0))
     view.btn_prev.clicked.connect(lambda: _navigate(view, presenter, -1))
     view.btn_next.clicked.connect(lambda: _navigate(view, presenter, 1))
@@ -83,4 +84,9 @@ def _start(view: MainWindow, presenter: MainPresenter) -> None:
 
 def _clear_title_selection(view: MainWindow, presenter: MainPresenter) -> None:
     view.clear_title_block_selection()
+    _refresh_preview(view, presenter, 0)
+
+
+def _select_template(view: MainWindow, presenter: MainPresenter) -> None:
+    view.choose_title_template()
     _refresh_preview(view, presenter, 0)

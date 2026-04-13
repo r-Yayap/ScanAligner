@@ -19,6 +19,7 @@ class PreviewService:
             page = doc.load_page(page_index)
             original = self._renderer.render_page_rgb(page, settings.render_dpi)
             manual_rect = self._manual_title_block_rect(original.shape[1], original.shape[0], settings)
+            template = self._load_title_block_template(settings, original, manual_rect)
             analysis = self._analyzer.analyze(
                 original,
                 AnalyzerConfig(
@@ -26,6 +27,7 @@ class PreviewService:
                     settings.edge_dark_threshold,
                     settings.detect_title_block,
                     manual_rect,
+                    template,
                 ),
             )
             processed = self._normalizer.normalize(
@@ -58,3 +60,24 @@ class PreviewService:
         w = max(1, min(w, width - x))
         h = max(1, min(h, height - y))
         return Rect(x, y, w, h)
+
+    def _load_title_block_template(self, settings: ProcessingSettings, original, manual_rect: Rect | None):
+        if settings.title_block_template_path is not None:
+            template = self._load_template_file(settings.title_block_template_path)
+            if template is not None:
+                return template
+        if settings.derive_template_from_selection and manual_rect is not None:
+            return original[manual_rect.y:manual_rect.y + manual_rect.h, manual_rect.x:manual_rect.x + manual_rect.w].copy()
+        return None
+
+    def _load_template_file(self, path):
+        if path.suffix.lower() == ".pdf":
+            doc = self._renderer.open_document(path)
+            try:
+                if doc.page_count == 0:
+                    return None
+                first_page = doc.load_page(0)
+                return self._renderer.render_page_rgb(first_page, 200)
+            finally:
+                doc.close()
+        return cv2.imread(str(path))
