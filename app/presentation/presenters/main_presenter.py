@@ -43,11 +43,24 @@ class MainPresenter:
         self.input_files = [p for i, p in enumerate(self.input_files) if i not in indexes]
         self.view.set_files(self.input_files)
 
-    def preview(self, file_index: int, page_index: int, settings: ProcessingSettings, include_processed: bool = False) -> None:
+    def preview(
+        self,
+        file_index: int,
+        page_index: int,
+        settings: ProcessingSettings,
+        include_processed: bool = False,
+        preview_mode: str = "processed",
+    ) -> None:
         if not self.input_files:
             return
         path = self.input_files[file_index]
-        original, processed, page_total = self.preview_service.preview_page(path, page_index, settings, include_processed=include_processed)
+        original, processed, page_total = self.preview_service.preview_page(
+            path,
+            page_index,
+            settings,
+            include_processed=include_processed,
+            preview_mode=preview_mode,
+        )
         current = min(page_index, max(0, page_total - 1)) + 1
         self.current_page = current - 1
         self.view.set_page_label(current, page_total)
