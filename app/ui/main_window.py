@@ -157,7 +157,9 @@ class MainWindow(QMainWindow):
         self.btn_next = QPushButton("Next Page")
         self.lbl_page = QLabel("0/0")
         self.btn_preview = QPushButton("Refresh Preview")
-        nav.addWidget(self.btn_prev); nav.addWidget(self.btn_next); nav.addWidget(self.lbl_page); nav.addWidget(self.btn_preview)
+        self.cmb_preview_mode = QComboBox()
+        self.cmb_preview_mode.addItems(["processed", "template_vs_detected", "template_search_region"])
+        nav.addWidget(self.btn_prev); nav.addWidget(self.btn_next); nav.addWidget(self.lbl_page); nav.addWidget(self.btn_preview); nav.addWidget(QLabel("Preview mode")); nav.addWidget(self.cmb_preview_mode)
         layout.addLayout(nav)
 
         pv = QHBoxLayout()
@@ -273,6 +275,7 @@ class MainWindow(QMainWindow):
         self.txt_output.setToolTip("Destination folder where processed PDFs are written.")
         self.btn_browse_out.setToolTip("Choose the output folder.")
         self.chk_overwrite.setToolTip("If enabled, existing output files with the same name are replaced.")
+        self.cmb_preview_mode.setToolTip("Controls what is shown on the right preview: final processed page, template vs detected block comparison, or template search focus area.")
 
     def selected_title_block_rect(self) -> tuple[int, int, int, int] | None:
         return self.lbl_original.selected_image_rect()
@@ -296,3 +299,6 @@ class MainWindow(QMainWindow):
     def processing_done(self) -> None:
         self.btn_start.setEnabled(True)
         self.btn_cancel.setEnabled(False)
+
+    def selected_preview_mode(self) -> str:
+        return self.cmb_preview_mode.currentText()

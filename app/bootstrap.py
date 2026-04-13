@@ -38,6 +38,7 @@ def build_app() -> tuple[MainWindow, MainPresenter]:
     view.file_list.currentRowChanged.connect(lambda _: _refresh_preview(view, presenter, 0))
     view.chk_manual_title_block.toggled.connect(lambda _: _refresh_preview(view, presenter, 0))
     view.btn_clear_title_selection.clicked.connect(lambda: _clear_title_selection(view, presenter))
+    view.cmb_preview_mode.currentIndexChanged.connect(lambda _: _refresh_preview(view, presenter, 0, include_processed=True))
     view.lbl_original.selection_changed.connect(lambda _: _refresh_preview(view, presenter, 0))
     view.btn_start.clicked.connect(lambda: _start(view, presenter))
     view.btn_cancel.clicked.connect(presenter.cancel_processing)
@@ -70,7 +71,13 @@ def _refresh_preview(view: MainWindow, presenter: MainPresenter, delta: int, inc
     presenter.current_page = max(0, presenter.current_page + delta)
     settings = view.get_settings()
     idx = view.current_file_index()
-    presenter.preview(idx, presenter.current_page, settings, include_processed=include_processed)
+    presenter.preview(
+        idx,
+        presenter.current_page,
+        settings,
+        include_processed=include_processed,
+        preview_mode=view.selected_preview_mode(),
+    )
 
 
 def _navigate(view: MainWindow, presenter: MainPresenter, delta: int) -> None:
