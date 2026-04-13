@@ -79,11 +79,16 @@ class MainWindow(QMainWindow):
         self.chk_title_overlay = QCheckBox(); self.chk_title_overlay.setChecked(True)
         self.chk_manual_title_block = QCheckBox(); self.chk_manual_title_block.setChecked(False)
         self.chk_template_from_selection = QCheckBox(); self.chk_template_from_selection.setChecked(False)
+        self.chk_debug_tracing = QCheckBox(); self.chk_debug_tracing.setChecked(False)
         self.btn_clear_title_selection = QPushButton("Clear title block selection")
         self.txt_title_template = QLineEdit("")
         self.btn_browse_template = QPushButton("Browse")
         template_row = QHBoxLayout(); template_row.addWidget(self.txt_title_template); template_row.addWidget(self.btn_browse_template)
         template_widget = QWidget(); template_widget.setLayout(template_row)
+        self.spin_preflight_pages = QSpinBox(); self.spin_preflight_pages.setRange(0, 20); self.spin_preflight_pages.setValue(2)
+        self.spin_template_region = QSpinBox(); self.spin_template_region.setRange(10, 90); self.spin_template_region.setValue(55); self.spin_template_region.setSuffix("%")
+        self.spin_template_min_matches = QSpinBox(); self.spin_template_min_matches.setRange(8, 80); self.spin_template_min_matches.setValue(20)
+        self.spin_template_features = QSpinBox(); self.spin_template_features.setRange(500, 8000); self.spin_template_features.setValue(2200); self.spin_template_features.setSingleStep(100)
         self.cmb_page_size = QComboBox()
         self.cmb_page_size.addItems([
             PageSizeMode.PRESERVE_DOMINANT.value,
@@ -112,6 +117,11 @@ class MainWindow(QMainWindow):
         form.addRow("Use selected block as template", self.chk_template_from_selection)
         form.addRow("Select title block on page", self.chk_manual_title_block)
         form.addRow("", self.btn_clear_title_selection)
+        form.addRow("Preflight sample pages", self.spin_preflight_pages)
+        form.addRow("Template search start", self.spin_template_region)
+        form.addRow("Template min good matches", self.spin_template_min_matches)
+        form.addRow("Template max features", self.spin_template_features)
+        form.addRow("Debug processing trace", self.chk_debug_tracing)
         form.addRow("Page size mode", self.cmb_page_size)
         form.addRow("Content threshold", self.spin_threshold)
         form.addRow("Dark edge threshold", self.spin_dark)
@@ -176,6 +186,11 @@ class MainWindow(QMainWindow):
             manual_title_block_rect=self.selected_title_block_rect(),
             title_block_template_path=Path(p) if (p := self.txt_title_template.text().strip()) else None,
             derive_template_from_selection=self.chk_template_from_selection.isChecked(),
+            template_search_region_ratio=self.spin_template_region.value() / 100,
+            template_min_good_matches=self.spin_template_min_matches.value(),
+            template_max_features=self.spin_template_features.value(),
+            preflight_sample_pages=self.spin_preflight_pages.value(),
+            debug_tracing=self.chk_debug_tracing.isChecked(),
             page_size_mode=PageSizeMode(self.cmb_page_size.currentText()),
             content_threshold=self.spin_threshold.value(),
             edge_dark_threshold=self.spin_dark.value(),
@@ -244,6 +259,11 @@ class MainWindow(QMainWindow):
         self.chk_template_from_selection.setToolTip("Uses the rectangle selected on the current page as the template patch for title block matching.")
         self.chk_manual_title_block.setToolTip("Enables rectangle selection on the original preview to manually mark a title block area.")
         self.btn_clear_title_selection.setToolTip("Clears the manually selected title block rectangle.")
+        self.spin_preflight_pages.setToolTip("How many pages per PDF are analyzed in the preflight pass. 0 = analyze every page (slower, most accurate).")
+        self.spin_template_region.setToolTip("Template matching search starts from this percentage into the page from top-left. Higher values focus on bottom-right and reduce compute.")
+        self.spin_template_min_matches.setToolTip("Minimum feature matches required for template-based title block detection. Higher = stricter and often more accurate.")
+        self.spin_template_features.setToolTip("Maximum keypoints used by feature detector for template matching. Lower values reduce CPU load.")
+        self.chk_debug_tracing.setToolTip("Adds debug timing and selected template/matching configuration into the processing log.")
         self.cmb_page_size.setToolTip("Controls output page sizing: preserve dominant size, force all pages to one size, or fit around content.")
         self.spin_threshold.setToolTip("Pixel intensity threshold for content detection. Lower values keep lighter marks; higher values are stricter.")
         self.spin_dark.setToolTip("Threshold for dark-edge detection strength. Increase if scanner shadows are still visible.")

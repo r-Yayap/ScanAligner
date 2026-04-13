@@ -31,6 +31,9 @@ class PreviewService:
                     settings.detect_title_block,
                     manual_rect,
                     template,
+                    settings.template_search_region_ratio,
+                    settings.template_min_good_matches,
+                    settings.template_max_features,
                 ),
             )
             processed = self._normalizer.normalize(
