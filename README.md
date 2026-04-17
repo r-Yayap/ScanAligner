@@ -21,6 +21,9 @@ Eskan is a PySide6 desktop application for normalizing scanned PDF pages before 
 9. Fit every page on the standardized canvas with configured margin ratio and anchor.
 10. Write processed pages back to output PDF.
 
+In `outer_frame` mode, frame reference can be taken from the **first confident page** (default) or from a median consensus across the document.
+You can also export per-page frame-debug artifacts (`rectified`, `bw_mask`, `frame_overlay`, `canvas_preview`) to inspect clipping/detection issues.
+
 ## Run the desktop app
 ```bash
 python -m venv .venv

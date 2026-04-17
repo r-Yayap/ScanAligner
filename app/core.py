@@ -36,8 +36,9 @@ New in v10:
 from __future__ import annotations
 
 import argparse
+import json
 from pathlib import Path
-from typing import Optional, Tuple
+from typing import List, Optional, Tuple
 
 import cv2
 import fitz  # PyMuPDF
@@ -516,9 +517,6 @@ def detect_outer_frame_bbox_with_confidence(
     row_support = _moving_average_1d((horiz > 0).sum(axis=1), max(3, h // 250))
     col_support = _moving_average_1d((vert > 0).sum(axis=0), max(3, w // 250))
 
-    min_row_support = w * 0.15
-    min_col_support = h * 0.15
-
     top_band_end = max(edge_strip + 5, int(round(h * 0.24)))
     bottom_band_start = min(h - edge_strip - 5, int(round(h * 0.70)))
     left_band_end = max(edge_strip + 5, int(round(w * 0.24)))
@@ -538,35 +536,84 @@ def detect_outer_frame_bbox_with_confidence(
             return None
         return int(start + idxs[-1])
 
-    top = first_support_index(row_support, edge_strip + 1, top_band_end, min_row_support)
-    bottom = last_support_index(row_support, bottom_band_start, h - edge_strip - 1, min_row_support)
-    left = first_support_index(col_support, edge_strip + 1, left_band_end, min_col_support)
-    right = last_support_index(col_support, right_band_start, w - edge_strip - 1, min_col_support)
+    def build_candidate(min_row_ratio: float, min_col_ratio: float) -> Tuple[Optional[Tuple[int, int, int, int]], float]:
+        min_row_support = w * min_row_ratio
+        min_col_support = h * min_col_ratio
 
-    if None not in (top, bottom, left, right):
+        top = first_support_index(row_support, edge_strip + 1, top_band_end, min_row_support)
+        bottom = last_support_index(row_support, bottom_band_start, h - edge_strip - 1, min_row_support)
+        left = first_support_index(col_support, edge_strip + 1, left_band_end, min_col_support)
+        right = last_support_index(col_support, right_band_start, w - edge_strip - 1, min_col_support)
+        if None in (top, bottom, left, right):
+            return None, 0.0
+
         x0, y0 = int(left), int(top)
         x1, y1 = int(right) + 1, int(bottom) + 1
+        row_expand_support = max(w * 0.03, min_row_support * 0.40)
+        col_expand_support = max(h * 0.03, min_col_support * 0.40)
+
+        for r in range(y0, edge_strip, -1):
+            if row_support[r] >= row_expand_support:
+                y0 = r
+            else:
+                break
+        for r in range(y1 - 1, h - edge_strip - 1):
+            if row_support[r] >= row_expand_support:
+                y1 = r + 1
+
+        for c in range(x0, edge_strip, -1):
+            if col_support[c] >= col_expand_support:
+                x0 = c
+            else:
+                break
+        for c in range(x1 - 1, w - edge_strip - 1):
+            if col_support[c] >= col_expand_support:
+                x1 = c + 1
+
         bw, bh = x1 - x0, y1 - y0
+        if bw < w * 0.72 or bh < h * 0.72:
+            return None, 0.0
 
-        if bw >= w * 0.80 and bh >= h * 0.80:
-            confidences = [
-                min(1.0, float(row_support[top]) / max(1.0, w * 0.55)),
-                min(1.0, float(row_support[bottom]) / max(1.0, w * 0.55)),
-                min(1.0, float(col_support[left]) / max(1.0, h * 0.55)),
-                min(1.0, float(col_support[right]) / max(1.0, h * 0.55)),
-            ]
-            confidence = float(np.mean(confidences))
+        confidences = [
+            min(1.0, float(row_support[top]) / max(1.0, w * 0.55)),
+            min(1.0, float(row_support[bottom]) / max(1.0, w * 0.55)),
+            min(1.0, float(col_support[left]) / max(1.0, h * 0.55)),
+            min(1.0, float(col_support[right]) / max(1.0, h * 0.55)),
+        ]
+        confidence = float(np.mean(confidences))
 
-            x0 = int(round(x0 / scale))
-            y0 = int(round(y0 / scale))
-            x1 = int(round(x1 / scale))
-            y1 = int(round(y1 / scale))
-            H, W = image.shape[:2]
-            x0 = int(np.clip(x0, 0, max(0, W - 2)))
-            y0 = int(np.clip(y0, 0, max(0, H - 2)))
-            x1 = int(np.clip(x1, x0 + 1, W))
-            y1 = int(np.clip(y1, y0 + 1, H))
-            return validate_outer_frame_candidate(image, (x0, y0, x1 - x0, y1 - y0), confidence, reject_paper_edge_frames=reject_paper_edge_frames)
+        x0 = int(round(x0 / scale))
+        y0 = int(round(y0 / scale))
+        x1 = int(round(x1 / scale))
+        y1 = int(round(y1 / scale))
+        H, W = image.shape[:2]
+        x0 = int(np.clip(x0, 0, max(0, W - 2)))
+        y0 = int(np.clip(y0, 0, max(0, H - 2)))
+        x1 = int(np.clip(x1, x0 + 1, W))
+        y1 = int(np.clip(y1, y0 + 1, H))
+        return validate_outer_frame_candidate(
+            image,
+            (x0, y0, x1 - x0, y1 - y0),
+            confidence,
+            reject_paper_edge_frames=reject_paper_edge_frames,
+        )
+
+    candidates: List[Tuple[Tuple[int, int, int, int], float]] = []
+    for threshold in (0.15, 0.12, 0.10, 0.08, 0.06):
+        candidate_bbox, candidate_conf = build_candidate(threshold, threshold)
+        if candidate_bbox is not None:
+            candidates.append((candidate_bbox, candidate_conf))
+
+    if candidates:
+        candidates.sort(
+            key=lambda row: (
+                row[0][0] + row[0][2] + row[0][1] + row[0][3],
+                row[0][2] * row[0][3],
+                row[1],
+            ),
+            reverse=True,
+        )
+        return candidates[0]
 
     fallback = _detect_outer_frame_bbox_union(image, use_black_white=use_black_white, ink_mask=ink_mask)
     if fallback is None:
@@ -791,6 +838,7 @@ def collect_document_frame_consensus(
     detect_dpi: int = 72,
     reject_paper_edge_frames: bool = True,
     use_black_white_for_frame_detection: bool = True,
+    reference_mode: str = "first_good",
 ) -> Optional[Tuple[float, float, float, float]]:
     """
     Build a robust document-level median frame rectangle in normalized fractions.
@@ -817,12 +865,24 @@ def collect_document_frame_consensus(
     if not fraction_rows:
         return None
 
+    if reference_mode == "first_good":
+        confidence_threshold = 0.45
+        for fracs, confidence in fraction_rows:
+            if confidence >= confidence_threshold:
+                return fracs
+        # Important: if no confident page exists, do NOT lock the whole
+        # document to page 1. Fall back to robust median logic instead.
+
     frac_arr = np.asarray([row[0] for row in fraction_rows], dtype=np.float32)
     conf_arr = np.asarray([row[1] for row in fraction_rows], dtype=np.float32)
 
     confident = frac_arr[conf_arr >= max(0.45, float(np.median(conf_arr)) * 0.9)]
     if len(confident) == 0:
-        confident = frac_arr
+        confident = frac_arr[conf_arr >= 0.35]
+    if len(confident) == 0:
+        # Consensus is too weak to trust; disable it so pages use their own
+        # per-page frame detection path instead of one bad shared bbox.
+        return None
 
     median = np.median(confident, axis=0)
     dists = np.max(np.abs(confident - median), axis=1)
@@ -889,6 +949,8 @@ def normalize_outer_frame_mode(
     use_black_white_for_frame_detection: bool = True,
     output_color_mode: str = "color",
     use_shared_bw_corner_lock: bool = True,
+    debug_output_dir: Optional[Path] = None,
+    debug_page_index: int = 0,
 ) -> np.ndarray:
     rectified, quad = rectify_page_image(image)
     shared_bw = make_shared_black_white_output(rectified) if use_black_white_for_frame_detection else None
@@ -921,14 +983,17 @@ def normalize_outer_frame_mode(
     if document_frame_fractions is not None:
         consensus_bbox = fractions_to_bbox(document_frame_fractions, src_w, src_h)
 
+    used_consensus_bbox = False
     if consensus_bbox is not None:
         if frame_bbox is None:
             frame_bbox = consensus_bbox
+            used_consensus_bbox = True
         else:
             page_fracs = bbox_to_fractions(frame_bbox, src_w, src_h)
             diff = frame_fraction_distance(page_fracs, document_frame_fractions)
             if frame_confidence < 0.55 or diff > 0.012:
                 frame_bbox = consensus_bbox
+                used_consensus_bbox = True
 
     if frame_bbox is None:
         return normalize_page_mode(
@@ -941,7 +1006,35 @@ def normalize_outer_frame_mode(
             page_anchor=page_anchor,
         )
 
+    raw_frame_bbox = frame_bbox
     x, y, bw, bh = frame_bbox
+    # Safety: extend right/bottom edges to the last meaningful ink support so
+    # dense title blocks/annotations near page edges are not clipped.
+    support_mask = shared_ink_mask if shared_ink_mask is not None else make_shared_ink_mask(rectified)
+    if support_mask is not None:
+        row_counts = (support_mask > 0).sum(axis=1)
+        col_counts = (support_mask > 0).sum(axis=0)
+        min_row_ink = max(8, int(round(src_w * 0.01)))
+        min_col_ink = max(8, int(round(src_h * 0.01)))
+        row_idxs = np.where(row_counts >= min_row_ink)[0]
+        col_idxs = np.where(col_counts >= min_col_ink)[0]
+        if len(col_idxs) > 0:
+            x_right = max(x + bw, int(col_idxs[-1]) + 1)
+            bw = max(1, min(src_w, x_right) - x)
+        if len(row_idxs) > 0:
+            y_bottom = max(y + bh, int(row_idxs[-1]) + 1)
+            bh = max(1, min(src_h, y_bottom) - y)
+    # Guard band to prevent clipping when right/bottom frame lines are faint and
+    # detected slightly inside the true printed outer frame.
+    # Lower confidence -> slightly larger guard.
+    guard_ratio = 0.004 if frame_confidence >= 0.55 else 0.008
+    guard_px = max(2, int(round(min(src_w, src_h) * guard_ratio)))
+    x0 = max(0, x - guard_px)
+    y0 = max(0, y - guard_px)
+    x1 = min(src_w, x + bw + guard_px)
+    y1 = min(src_h, y + bh + guard_px)
+    x, y, bw, bh = x0, y0, max(1, x1 - x0), max(1, y1 - y0)
+    guarded_frame_bbox = (x, y, bw, bh)
 
     margin_px = mm_to_px(canvas_margin_mm, dpi)
     target_x = margin_px
@@ -981,6 +1074,49 @@ def normalize_outer_frame_mode(
         canvas = np.full((canvas_h, canvas_w, 3), 255, dtype=np.uint8)
 
     paste_image_with_offset(canvas, scaled, paste_x, paste_y)
+
+    if debug_output_dir is not None:
+        debug_output_dir.mkdir(parents=True, exist_ok=True)
+        debug_prefix = debug_output_dir / f"page_{debug_page_index + 1:04d}"
+        overlay = rectified.copy()
+        rx, ry, rw, rh = raw_frame_bbox
+        gx, gy, gw, gh = guarded_frame_bbox
+        cv2.rectangle(overlay, (rx, ry), (rx + rw, ry + rh), (0, 0, 255), 2)
+        cv2.rectangle(overlay, (gx, gy), (gx + gw, gy + gh), (0, 180, 0), 2)
+        if consensus_bbox is not None:
+            cx, cy, cw, ch = consensus_bbox
+            cv2.rectangle(overlay, (cx, cy), (cx + cw, cy + ch), (255, 0, 0), 2)
+        cv2.putText(
+            overlay,
+            f"conf={frame_confidence:.3f} consensus={'yes' if used_consensus_bbox else 'no'}",
+            (20, 34),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            0.9,
+            (0, 0, 0),
+            2,
+            cv2.LINE_AA,
+        )
+        cv2.imwrite(str(debug_prefix.with_name(debug_prefix.name + "_rectified.png")), rectified)
+        mask_preview = shared_bw if shared_bw is not None else make_shared_black_white_output(rectified)
+        cv2.imwrite(str(debug_prefix.with_name(debug_prefix.name + "_bw_mask.png")), mask_preview)
+        cv2.imwrite(str(debug_prefix.with_name(debug_prefix.name + "_frame_overlay.png")), overlay)
+        cv2.imwrite(str(debug_prefix.with_name(debug_prefix.name + "_canvas_preview.png")), canvas)
+        metadata = {
+            "page_index": debug_page_index,
+            "frame_confidence": float(frame_confidence),
+            "raw_frame_bbox": [int(v) for v in raw_frame_bbox],
+            "guarded_frame_bbox": [int(v) for v in guarded_frame_bbox],
+            "consensus_bbox": [int(v) for v in consensus_bbox] if consensus_bbox is not None else None,
+            "used_consensus_bbox": bool(used_consensus_bbox),
+            "paste_xy": [int(paste_x), int(paste_y)],
+            "scaled_size": [int(new_w), int(new_h)],
+            "canvas_size": [int(canvas_w), int(canvas_h)],
+        }
+        debug_prefix.with_name(debug_prefix.name + "_metrics.json").write_text(
+            json.dumps(metadata, indent=2),
+            encoding="utf-8",
+        )
+
     return canvas
 
 
@@ -1040,6 +1176,8 @@ def normalize_scanned_page(
     output_color_mode: str = "color",
     use_black_white_for_frame_detection: bool = True,
     use_shared_bw_corner_lock: bool = True,
+    debug_output_dir: Optional[Path] = None,
+    debug_page_index: int = 0,
 ) -> np.ndarray:
     if mode == "page":
         return normalize_page_mode(
@@ -1065,6 +1203,8 @@ def normalize_scanned_page(
             use_black_white_for_frame_detection=use_black_white_for_frame_detection,
             output_color_mode=output_color_mode,
             use_shared_bw_corner_lock=use_shared_bw_corner_lock,
+            debug_output_dir=debug_output_dir,
+            debug_page_index=debug_page_index,
         )
 
     return normalize_content_mode(
@@ -1127,10 +1267,12 @@ def process_pdf(
     page_placement: str = "fill",
     page_anchor: str = "BR",
     use_document_frame_consensus: bool = True,
+    frame_reference_mode: str = "first_good",
     output_color_mode: str = "color",
     reject_paper_edge_frames: bool = True,
     use_black_white_for_frame_detection: bool = True,
     use_shared_bw_corner_lock: bool = True,
+    export_outer_frame_debug: bool = False,
 ) -> None:
     src = fitz.open(input_pdf)
     out_doc = fitz.open()
@@ -1142,7 +1284,11 @@ def process_pdf(
                 detect_dpi=min(96, dpi),
                 reject_paper_edge_frames=reject_paper_edge_frames,
                 use_black_white_for_frame_detection=use_black_white_for_frame_detection,
+                reference_mode=frame_reference_mode,
             )
+        debug_output_dir = None
+        if mode == "outer_frame" and export_outer_frame_debug:
+            debug_output_dir = output_pdf.parent / f"{output_pdf.stem}_debug"
         for page_index in range(src.page_count):
             page = src.load_page(page_index)
             img = render_pdf_page_to_bgr(page, dpi=dpi)
@@ -1162,6 +1308,8 @@ def process_pdf(
                 output_color_mode=output_color_mode,
                 use_black_white_for_frame_detection=use_black_white_for_frame_detection,
                 use_shared_bw_corner_lock=use_shared_bw_corner_lock,
+                debug_output_dir=debug_output_dir,
+                debug_page_index=page_index,
             )
             add_image_page_to_pdf(out_doc=out_doc, img=normalized, dpi=dpi, output_color_mode=output_color_mode)
 
@@ -1216,6 +1364,12 @@ def build_arg_parser() -> argparse.ArgumentParser:
         help="outer_frame mode only. Disable the document-level median frame consensus used to stabilize outlier pages.",
     )
     parser.add_argument(
+        "--frame-reference-mode",
+        choices=["first_good", "median_consensus"],
+        default="first_good",
+        help="outer_frame mode only. Choose whether frame consensus is based on the first confident page or the document median.",
+    )
+    parser.add_argument(
         "--allow-paper-edge-frames",
         action="store_true",
         help="outer_frame mode only. Allow detections that hug the paper edge even when they do not look like a true inset printed frame.",
@@ -1229,6 +1383,11 @@ def build_arg_parser() -> argparse.ArgumentParser:
         "--disable-shared-bw-corner-lock",
         action="store_true",
         help="outer_frame + black_white only. Do not reuse the same B/W mask for final BR corner locking and export.",
+    )
+    parser.add_argument(
+        "--export-outer-frame-debug",
+        action="store_true",
+        help="outer_frame mode only. Export per-page debug images (rectified, mask, frame overlay, canvas preview).",
     )
     parser.add_argument(
         "--output-color-mode",
@@ -1295,10 +1454,12 @@ def main() -> None:
             page_placement=args.page_placement,
             page_anchor=args.page_anchor,
             use_document_frame_consensus=not args.disable_document_frame_consensus,
+            frame_reference_mode=args.frame_reference_mode,
             output_color_mode=args.output_color_mode,
             reject_paper_edge_frames=not args.allow_paper_edge_frames,
             use_black_white_for_frame_detection=not args.disable_black_white_frame_detection,
             use_shared_bw_corner_lock=not args.disable_shared_bw_corner_lock,
+            export_outer_frame_debug=args.export_outer_frame_debug,
         )
         print(f"    Saved: {out_pdf}")
 

@@ -108,11 +108,15 @@ class ProcessingWorker(QObject):
                     page_placement=self.settings.page_placement,
                     page_anchor=self.settings.page_anchor,
                     use_document_frame_consensus=self.settings.use_document_frame_consensus,
+                    frame_reference_mode=self.settings.frame_reference_mode,
                     output_color_mode=self.settings.output_color_mode,
                     reject_paper_edge_frames=self.settings.reject_paper_edge_frames,
                     use_black_white_for_frame_detection=self.settings.use_black_white_for_frame_detection,
                     use_shared_bw_corner_lock=self.settings.use_shared_bw_corner_lock,
+                    export_outer_frame_debug=self.settings.export_outer_frame_debug,
                 )
+                if self.settings.mode == "outer_frame" and self.settings.export_outer_frame_debug:
+                    self.log_message.emit(f"Debug overlays: {output_pdf.parent / (output_pdf.stem + '_debug')}")
                 self.progress_changed.emit(int(index / total * 100))
                 self.log_message.emit("Done.")
 
@@ -222,6 +226,8 @@ class MainWindow(QMainWindow):
         root.addWidget(self.log, 1)
 
         self.mode_combo.currentTextChanged.connect(self.update_mode_ui)
+        self.output_color_combo.currentTextChanged.connect(lambda _: self.update_mode_ui(self.mode_combo.currentText()))
+        self.frame_consensus_check.toggled.connect(lambda _: self.update_mode_ui(self.mode_combo.currentText()))
         self.start_button.clicked.connect(self.start_processing)
         self.cancel_button.clicked.connect(self.cancel_processing)
         self.reload_config_button.clicked.connect(self.reload_config)
@@ -299,9 +305,12 @@ class MainWindow(QMainWindow):
 
         self.recursive_check = QCheckBox("Include subfolders when input is a folder")
         self.frame_consensus_check = QCheckBox("Use document frame consensus in outer_frame mode")
+        self.frame_reference_combo = QComboBox()
+        self.frame_reference_combo.addItems(["first_good", "median_consensus"])
         self.reject_paper_edge_check = QCheckBox("Reject paper-edge / missing-frame detections")
         self.bw_frame_detection_check = QCheckBox("Use black-and-white mask for frame detection")
         self.shared_bw_corner_lock_check = QCheckBox("Reuse same B/W mask for BR corner locking and final export")
+        self.outer_frame_debug_check = QCheckBox("Export outer-frame debug overlays")
 
         form.addRow("Page Size", self.page_size_combo)
         form.addRow("Mode", self.mode_combo)
@@ -314,9 +323,11 @@ class MainWindow(QMainWindow):
         form.addRow("Canvas Margin (mm)", self.canvas_margin_spin)
         form.addRow("", self.recursive_check)
         form.addRow("", self.frame_consensus_check)
+        form.addRow("Frame Reference", self.frame_reference_combo)
         form.addRow("", self.reject_paper_edge_check)
         form.addRow("", self.bw_frame_detection_check)
         form.addRow("", self.shared_bw_corner_lock_check)
+        form.addRow("", self.outer_frame_debug_check)
         return box
 
     def _build_config_box(self) -> QGroupBox:
@@ -361,9 +372,11 @@ class MainWindow(QMainWindow):
         self.content_margin_spin.setEnabled(is_content)
         self.template_picker.setEnabled(is_content)
         self.frame_consensus_check.setEnabled(is_outer_frame)
+        self.frame_reference_combo.setEnabled(is_outer_frame and self.frame_consensus_check.isChecked())
         self.reject_paper_edge_check.setEnabled(is_outer_frame)
         self.bw_frame_detection_check.setEnabled(is_outer_frame)
         self.shared_bw_corner_lock_check.setEnabled(is_outer_frame and self.output_color_combo.currentText() == "black_white")
+        self.outer_frame_debug_check.setEnabled(is_outer_frame)
 
         if is_outer_frame:
             self.hint.setText(
@@ -395,9 +408,11 @@ class MainWindow(QMainWindow):
 
         self.recursive_check.setChecked(settings.recursive)
         self.frame_consensus_check.setChecked(settings.use_document_frame_consensus)
+        self.frame_reference_combo.setCurrentText(settings.frame_reference_mode)
         self.reject_paper_edge_check.setChecked(settings.reject_paper_edge_frames)
         self.bw_frame_detection_check.setChecked(settings.use_black_white_for_frame_detection)
         self.shared_bw_corner_lock_check.setChecked(settings.use_shared_bw_corner_lock)
+        self.outer_frame_debug_check.setChecked(settings.export_outer_frame_debug)
 
     def gather_settings_from_ui(self) -> EscanorSettings:
         return EscanorSettings(
@@ -415,9 +430,11 @@ class MainWindow(QMainWindow):
             page_placement=self.page_placement_combo.currentText(),
             page_anchor=self.page_anchor_combo.currentText(),
             use_document_frame_consensus=self.frame_consensus_check.isChecked(),
+            frame_reference_mode=self.frame_reference_combo.currentText(),
             reject_paper_edge_frames=self.reject_paper_edge_check.isChecked(),
             use_black_white_for_frame_detection=self.bw_frame_detection_check.isChecked(),
             use_shared_bw_corner_lock=self.shared_bw_corner_lock_check.isChecked(),
+            export_outer_frame_debug=self.outer_frame_debug_check.isChecked(),
         )
 
     def validate_inputs(self, settings: EscanorSettings) -> bool:
