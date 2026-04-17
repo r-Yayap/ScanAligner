@@ -30,9 +30,11 @@ class EscanorSettings:
     page_anchor: str = "BR"
 
     use_document_frame_consensus: bool = True
+    frame_reference_mode: str = "first_good"
     reject_paper_edge_frames: bool = True
     use_black_white_for_frame_detection: bool = True
     use_shared_bw_corner_lock: bool = True
+    export_outer_frame_debug: bool = False
 
 
 def app_root() -> Path:
@@ -105,6 +107,7 @@ def load_settings(path: Path | None = None) -> EscanorSettings:
         settings.use_document_frame_consensus = _bool(
             section.get("use_document_frame_consensus"), settings.use_document_frame_consensus
         )
+        settings.frame_reference_mode = section.get("frame_reference_mode", settings.frame_reference_mode)
         settings.reject_paper_edge_frames = _bool(
             section.get("reject_paper_edge_frames"), settings.reject_paper_edge_frames
         )
@@ -113,6 +116,9 @@ def load_settings(path: Path | None = None) -> EscanorSettings:
         )
         settings.use_shared_bw_corner_lock = _bool(
             section.get("use_shared_bw_corner_lock"), settings.use_shared_bw_corner_lock
+        )
+        settings.export_outer_frame_debug = _bool(
+            section.get("export_outer_frame_debug"), settings.export_outer_frame_debug
         )
 
     return settings
@@ -149,6 +155,8 @@ def render_config_template(settings: EscanorSettings) -> str:
 #     fill | balanced
 # - page_anchor:
 #     TL | TR | BL | BR | C
+# - frame_reference_mode:
+#     first_good | median_consensus
 #
 # Practical starting defaults for engineering scans:
 # - mode = outer_frame
@@ -157,8 +165,10 @@ def render_config_template(settings: EscanorSettings) -> str:
 # - output_color_mode = color
 # - page_anchor = BR
 # - use_document_frame_consensus = true
+# - frame_reference_mode = first_good
 # - reject_paper_edge_frames = true
 # - use_black_white_for_frame_detection = true
+# - export_outer_frame_debug = false
 
 [paths]
 input_path = {settings.input_path}
@@ -177,7 +187,9 @@ canvas_margin_mm = {settings.canvas_margin_mm}
 page_placement = {settings.page_placement}
 page_anchor = {settings.page_anchor}
 use_document_frame_consensus = {"true" if settings.use_document_frame_consensus else "false"}
+frame_reference_mode = {settings.frame_reference_mode}
 reject_paper_edge_frames = {"true" if settings.reject_paper_edge_frames else "false"}
 use_black_white_for_frame_detection = {"true" if settings.use_black_white_for_frame_detection else "false"}
 use_shared_bw_corner_lock = {"true" if settings.use_shared_bw_corner_lock else "false"}
+export_outer_frame_debug = {"true" if settings.export_outer_frame_debug else "false"}
 """
