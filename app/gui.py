@@ -91,7 +91,7 @@ class ProcessingWorker(QObject):
                     self.log_message.emit("Cancelled by user.")
                     break
 
-                output_pdf = resolve_output_path(pdf_path, output_path, single_input=single_input)
+                output_pdf = resolve_output_path(pdf_path, output_path, single_input=single_input, input_root=input_path)
                 self.log_message.emit(f"[{index}/{total}] Processing: {pdf_path.name}")
                 self.log_message.emit(f"Output: {output_pdf}")
 

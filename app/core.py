@@ -1409,10 +1409,21 @@ def build_arg_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def resolve_output_path(input_pdf: Path, output_arg: Path, single_input: bool) -> Path:
+def resolve_output_path(input_pdf: Path, output_arg: Path, single_input: bool, input_root: Path | None = None) -> Path:
     if single_input and output_arg.suffix.lower() == ".pdf":
         return output_arg
+
     output_arg.mkdir(parents=True, exist_ok=True)
+
+    if input_root is not None and input_root.is_dir():
+        try:
+            relative_parent = input_pdf.parent.relative_to(input_root)
+        except ValueError:
+            relative_parent = Path()
+        target_dir = output_arg / relative_parent
+        target_dir.mkdir(parents=True, exist_ok=True)
+        return target_dir / f"{input_pdf.stem}_normalized.pdf"
+
     return output_arg / f"{input_pdf.stem}_normalized.pdf"
 
 
@@ -1439,7 +1450,7 @@ def main() -> None:
     single_input = input_path.is_file()
 
     for idx, pdf_path in enumerate(pdfs, start=1):
-        out_pdf = resolve_output_path(pdf_path, output_arg, single_input=single_input)
+        out_pdf = resolve_output_path(pdf_path, output_arg, single_input=single_input, input_root=input_path)
         print(f"[{idx}/{len(pdfs)}] Processing: {pdf_path.name}")
         process_pdf(
             input_pdf=pdf_path,
